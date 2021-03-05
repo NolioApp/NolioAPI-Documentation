@@ -1,3 +1,3 @@
-# NOlIO API for partners Information
+# NOLIO API for partners Information
 
-* [Nolio API Documentation](../../wiki)
+* [API Documentation](../../wiki)
