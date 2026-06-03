@@ -187,6 +187,7 @@ Index complet : https://github.com/NolioApp/NolioAPI-Documentation/wiki/API-Rout
 | Profil du user connecté | `/api/get/user/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/User-Get-Profile |
 | Métadonnées user | `/api/get/user/meta/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/User-Get-Metadata |
 | Athlètes d'un coach | `/api/get/athletes/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/User-Get-Athletes |
+| Hiérarchie d'équipe (teams → groupes → users) | `/api/get/teams/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/User-Get-Teams |
 | Séances réalisées | `/api/get/training/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/Retrieve-Workouts |
 | Détails d'une séance | `/api/get/training/info/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/Retrieve-Workouts |
 | Streams (HR, power, GPS…) | `/api/get/training/streams/` | https://github.com/NolioApp/NolioAPI-Documentation/wiki/Retrieve-Streams-Workout |
