@@ -307,12 +307,15 @@ Réponse 429 : JSON `{"detail": "Request was throttled."}`. Respecter `Retry-Aft
 
 Doc : https://github.com/NolioApp/NolioAPI-Documentation/wiki/Webhook-mechanism
 
-## Routing — 2 URLs à déclarer côté admin de l'app
+## Routing — 3 URLs à déclarer côté admin de l'app
 
 | URL configurée | Reçoit les events sur… |
 |---|---|
-| `webhook_event_real_url` | Training, Competition, Note |
+| `webhook_event_real_url` | Training, Competition, Note (réalisés) |
+| `webhook_event_planned_url` | Events **planifiés** (TrainingPlanned, CompetitionPlanned, NotePlanned…) |
 | `webhook_metrics_url` | Metric |
+
+> **Opt-in.** `webhook_event_planned_url` est **indépendante** : tant qu'elle n'est pas renseignée, l'app ne reçoit **aucun** webhook planifié. Les apps abonnées au seul réalisé ne sont pas impactées.
 
 ## Liste des events (`notif_type` dans le payload)
 
@@ -321,6 +324,9 @@ Doc : https://github.com/NolioApp/NolioAPI-Documentation/wiki/Webhook-mechanism
 | `new_event` | Création séance / compét / note | Training, Competition, Note |
 | `updated_event` | Modification idem | Training, Competition, Note |
 | `deleted_event` | Suppression idem | Training, Competition, Note |
+| `new_planned_event` | Création d'un event **planifié** | TrainingPlanned, CompetitionPlanned, NotePlanned, QuizPlanned, MessageTriggerPlanned |
+| `updated_planned_event` | Modification d'un event planifié | *(idem)* |
+| `deleted_planned_event` | Suppression d'un event planifié | *(idem)* |
 | `new_metric` | Création d'une métrique | Metric |
 | `updated_metric` | Modification d'une métrique | Metric |
 | `deleted_metric` | Suppression d'une métrique | Metric |
@@ -338,6 +344,13 @@ Doc : https://github.com/NolioApp/NolioAPI-Documentation/wiki/Webhook-mechanism
 ```
 
 Le contenu complet de l'objet n'est **pas** dans le payload — faire un GET sur l'endpoint correspondant (ex. `/api/get/training/?id=123`).
+
+### Events planifiés (`*_planned_event`)
+
+- `object_type` = un type `*Planned` (`TrainingPlanned`, `CompetitionPlanned`, `NotePlanned`, …).
+- **Une notification par sportif concerné** (`user_id` = le sportif). Une séance posée sur un groupe de N sportifs génère N notifications.
+- `date_object` = la **date planifiée** au format `YYYY-MM-DD` ; absent sur `deleted_planned_event`.
+- GET associé : `TrainingPlanned` / `CompetitionPlanned` / `NotePlanned` se récupèrent via `/api/get/planned/training/`, `/competition/`, `/note/`. Ignorer les `object_type` non gérés.
 
 ## Vérification du header `X-Nolio-Key`
 
