@@ -315,8 +315,6 @@ Doc : https://github.com/NolioApp/NolioAPI-Documentation/wiki/Webhook-mechanism
 | `webhook_event_planned_url` | Events **planifiés** (TrainingPlanned, CompetitionPlanned, NotePlanned…) |
 | `webhook_metrics_url` | Metric |
 
-> **Opt-in.** `webhook_event_planned_url` est **indépendante** : tant qu'elle n'est pas renseignée, l'app ne reçoit **aucun** webhook planifié. Les apps abonnées au seul réalisé ne sont pas impactées.
-
 ## Liste des events (`notif_type` dans le payload)
 
 | `notif_type` | Déclenché par | `object_type` possible |
