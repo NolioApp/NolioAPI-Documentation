@@ -337,11 +337,20 @@ Doc : https://github.com/NolioApp/NolioAPI-Documentation/wiki/Webhook-mechanism
   "object_type": "Training",
   "object_id": 123,
   "user_id": 456,
-  "date_object": "2026-01-15T08:00:00+00:00"
+  "date_object": "2026-01-15T08:00:00+00:00",
+  "livemode": true
 }
 ```
 
 Le contenu complet de l'objet n'est **pas** dans le payload — faire un GET sur l'endpoint correspondant (ex. `/api/get/training/?id=123`).
+
+### `livemode` & livraisons de test
+
+Tout payload porte `"livemode"` :
+- `true` — event **réel** (tous les webhooks de production).
+- `false` — **livraison de test** envoyée depuis le bouton *Send test* de la page Webhooks de ton app (portail). Une livraison de test porte aussi `"object_id": 0` (sentinelle qui ne résout jamais). **Ne traite jamais un payload `livemode: false` comme un vrai event** — ignore-le, ou utilise-le seulement pour confirmer que ton endpoint reçoit bien la requête et lit le `X-Nolio-Key`.
+
+`livemode` est un champ **additif** (2026-06) : il n'enlève rien, les intégrations existantes peuvent l'ignorer sans risque.
 
 ### Events planifiés (`*_planned_event`)
 
