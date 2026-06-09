@@ -301,6 +301,8 @@ Pas de métadonnées `next` / `count` dans la réponse. Pour parcourir un long h
 
 Réponse 429 : JSON `{"detail": "Request was throttled."}`. Respecter `Retry-After` si présent, sinon backoff exponentiel.
 
+Les apps **Dev** sont aussi limitées à **5 utilisateurs synchronisés** (modifiable au cas par cas). Au-delà, l'échange de token pour un *nouvel* utilisateur renvoie un `403` `{"error": "access_denied", "error_description": "Development app user limit reached (5 max)"}`. Les utilisateurs déjà synchronisés ne sont pas impactés. Passer en production pour lever la limite.
+
 ---
 
 # Webhooks
