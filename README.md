@@ -11,7 +11,7 @@ Tu utilises un assistant IA pour intégrer l'API Nolio ? Colle le prompt ci-dess
 **Pourquoi c'est utile :**
 
 - 🚫 **Évite les hallucinations** — les LLM ont tendance à inventer des endpoints ou des champs qui n'existent pas. Le prompt cadre ce qui est réellement supporté et liste ce qui ne l'est pas.
-- 📚 **29 endpoints référencés** avec lien direct vers leur page wiki correspondante — l'IA t'enverra toujours sur la bonne page de doc.
+- 📚 **30 endpoints référencés** avec lien direct vers leur page wiki correspondante — l'IA t'enverra toujours sur la bonne page de doc.
 - ⚠️ **Pièges connus documentés** : Tu évites les bugs classiques d'intégration dès le premier code généré.
 - 🎯 **Démarrage cadré** — l'IA te pose 3 questions (langage, objectif, état de tes credentials) avant d'écrire du code, au lieu de produire un blob générique inutilisable.
 - 🔐 **Code sécurisé par défaut** : `state` CSRF dans le flow OAuth, jamais de `client_secret` côté front.
@@ -53,6 +53,7 @@ Avant de produire du code, demande à l'utilisateur :
 - Lire et écrire des métriques (poids, sommeil, FC repos…)
 - Lire les records
 - Créer notes et messages d'entraînement
+- Marquer une séance comme vue (coach)
 - Uploader un fichier (`.fit`, `.tcx`)
 - Recevoir des webhooks (séance/métrique créée/modifiée/supprimée)
 
