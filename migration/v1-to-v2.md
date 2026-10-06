@@ -25,7 +25,10 @@ Sources of truth, in this order:
 1. The v2 OpenAPI schema: https://www.nolio.io/api/v2/openapi.json
 2. The migration guide: https://media.cdn.nolio.io/api/migration-v1-to-v2.md
 Fetch both before writing any code. Never invent an endpoint, field, parameter or
-enum value that is not in the OpenAPI schema. If something is missing, say so and stop.
+enum value that is in neither source. The structured workout format (workout nodes
+and targets) is specified in section 8 of the guide only: the OpenAPI schema types it
+as a plain array of objects. Validate each mapped workout with "dry_run": true before
+writing. If something is missing from both, say so and stop.
 
 Rules that apply everywhere in v2:
 - Base URL https://www.nolio.io/api/v2/ and every path ends with "/" (no redirect: a
@@ -43,8 +46,8 @@ Rules that apply everywhere in v2:
 - Updates are PATCH (partial), deletes are DELETE (204). No PUT on resources.
 - Competitions are separate resources from trainings, on both calendars.
 - A coach targets an athlete with ?athlete=usr_... on reads, updates, deletes and
-  realized creates, and with "athletes": ["usr_..."] (or "group": "grp_...") in the
-  body on planned creates.
+  realized creates, and with "athletes": ["usr_..."] (one athlete per create) or
+  "group": "grp_..." in the body on planned creates.
 - A PATCH or DELETE reaches any event the user can see, not only the ones your app
   created: only touch ids your integration stored.
 
@@ -106,7 +109,7 @@ Conditions (API terms): the personal app requires an active paid Nolio subscript
 **Personal app**
 - Create the key in the portal. Two key slots let you rotate without downtime: create the new key, deploy it, then revoke the old one. A key created in the portal lives until you revoke it; a key created with `POST app/pats/` (scope `app:manage`) can carry an expiry date.
 - Send it as `Authorization: Bearer nolio_sk_...`.
-- OAuth on the personal app is refused with `pat_required`. If your v1 personal app synced a few accounts through OAuth, move those flows to the API key (your own account and coached athletes) or to the partner app (anyone else).
+- OAuth on the personal app is refused at authorization: `/api/authorize/` and `/api/token/` answer `403 {"error": "access_denied"}`. If your v1 personal app synced a few accounts through OAuth, move those flows to the API key (your own account and coached athletes) or to the partner app (anyone else).
 
 **Partner app**
 - It starts blocked. A first request from the portal opens a **development mode limited to 5 accounts**. A second request moves it to production, with no account limit.
@@ -166,7 +169,7 @@ To keep what a v1 app could do, request: `real:read real:write real:delete plann
 
 ### 4.3 Team permission (new)
 
-In a team with **several coaches**, the team blocks API writes and deletes by coaches on its athletes by default, for `planned`, `real`, `metrics` and `settings`. Reads are allowed. A blocked call returns `403 team_scope_forbidden` with `scopes`, `team_name` and, for a manager of the team, `team_options_url`. A team manager allows it in **Team options > API and MCP**. Do not retry: show the message to the coach.
+In a team with **several coaches**, the team blocks API writes and deletes by coaches on its athletes by default, for `planned`, `real`, `metrics` and `settings`. Reads are allowed by default, but a team manager can block them too: handle `team_scope_forbidden` on reads as well. A blocked call returns `403 team_scope_forbidden` with `scopes`, `team_name` and, for a manager of the team, `team_options_url`. A team manager allows it in **Team options > API and MCP**. Do not retry: show the message to the coach.
 
 Separately, an athlete can turn off API access for their coaches (`403 athlete_api_access_denied`, with `athlete_name`, reads included) or refuse coach edits such as metrics edits (`403 permission_denied`).
 
@@ -221,7 +224,7 @@ v1 used your `id_partner` to address events (update, delete, message) and to avo
 | Update or delete a group's planned event | | `?group=grp_...` is required |
 | List the athletes you coach | `GET /api/get/athletes/` | `GET /api/v2/me/athletes/` |
 
-A planned event that targets several athletes individually is read-only (403). Planned notes, cycles, questionnaires and scheduled messages take one athlete or one group.
+Send one athlete per planned create to keep every id: with several ids in `athletes`, Nolio creates one individual event per athlete but the response returns only one of them (its `athletes` holds a single id). Planned competitions, notes, cycles, questionnaires and scheduled messages take one athlete or one group (several athletes is a 400).
 
 ### 5.5 Quantities, dates, nulls
 
@@ -231,9 +234,9 @@ A planned event that targets several athletes individually is read-only (403). P
 | Distance | Float, kilometers | `{"value": 12, "unit": "km"}`. Read in `km`; write in `m`, `km` or `mi` |
 | Elevation gain | Float, meters | `{"value": 80, "unit": "m"}`. Read in `m`; write in `m` or `ft` |
 | Date | `YYYY-MM-DD` | Same |
-| Time, realized events and notes (both calendars) | `hour_start` `HH:MM:SS` or `""` | `hour_start` `HH:MM:SS` |
+| Time, realized events and notes (both calendars) | `hour_start` `HH:MM:SS` or `""` | `hour_start` `HH:MM:SS`, read-only: a create or update that sends it is a 400 (v1 ignored it) |
 | Time, planned trainings and competitions | `hour_start` `HH:MM:SS` or `""` | `time` (`HH:MM`) or `moment` (time of day) |
-| Time, metric values / HRV | | `hour` `HH:MM:SS` / `HH:MM` |
+| Time, metric values / HRV | `hour` `HH:MM` or `""` / `HH:MM` | `hour` `HH:MM:SS` or `null` / `HH:MM` |
 | Missing value | `0` or `""` | `null` |
 | Sport | `sport` (name) + `sport_id` | `sport` = `spt_...` |
 | RPE, feeling, athlete comment | `rpe`, `feeling`, `description` | Grouped in `debrief: {rpe, feeling, comment}` |
@@ -300,11 +303,11 @@ v1 returned plain text in most errors (for example `400 "Invalid training_id"`).
 | 400 | `unknown_record_window` | Records window not in the catalog (`windows` lists the valid ones) |
 | 401 | `not_authenticated`, `authentication_failed` | Missing, unknown or expired token |
 | 403 | `missing_scope` | Scope not granted (`scopes` lists the missing ones) |
-| 403 | `team_scope_forbidden` | Team blocks API writes (section 4.3) |
+| 403 | `team_scope_forbidden` | Team blocks this API access (section 4.3): writes and deletes by default, reads if a manager chose to |
 | 403 | `athlete_api_access_denied` | The athlete turned off API access for their coaches |
 | 403 | `permission_denied` | No active paid Nolio subscription on the app owner, athlete you do not coach, or athlete-side edit setting |
 | 403 | `wrong_api_version` | v1 credentials on v2 (v2 credentials on `/api/` get a v1 403) |
-| 403 | `pat_required` | OAuth used on the personal app, or on `app/users/` and `app/webhook/` |
+| 403 | `pat_required` | An OAuth token used on `app/users/` or `app/webhook/` (use an API key of the app) |
 | 404 | `not_found` | Object does not exist **or is not visible to you**, or path without trailing slash |
 | 409 | `conflict` | Slot already taken (metrics), concurrent edit (workouts, section 8), overlapping cycle, plan on sale or purchased |
 | 429 | `throttled` | Quota exceeded, see `Retry-After` |
@@ -354,7 +357,7 @@ All v2 paths are relative to `https://www.nolio.io/api/v2/`. `{id}` stands for t
 | `POST /create/competition/` | `POST real/competitions/` | `real:write` | Same as trainings, plus `event`, `location`, `goal_type`, `result_link`, `perf`. `debrief.feeling` is read-only on competitions. Laps: `GET real/competitions/{cmp_id}/laps/` |
 | `POST /update/competition/` | `PATCH real/competitions/{cmp_id}/` | `real:write` | Same as trainings |
 | `POST /delete/competition/` | `DELETE real/competitions/{cmp_id}/` | `real:delete` | 204 |
-| `GET /get/note/` | `GET real/notes/`, `GET real/notes/{not_id}/` | `real:read` | `note_type` takes slugs (table below). `date`, `date_from`, `date_to` use overlap |
+| `GET /get/note/` | `GET real/notes/`, `GET real/notes/{not_id}/` | `real:read` | The v1 response key `type` becomes `note_type`, with slugs (table below). `injury_type`, `discomfort_type`, `sick_type`, and the `duration` and `sports` of availability notes are not returned in v2. `date`, `date_from`, `date_to` use overlap |
 | `POST /create/note/` | `POST real/notes/` | `real:write` | Fields: `name`, `date_start`, `description`, `color` |
 | `POST /update/note/` | `PATCH real/notes/{not_id}/` | `real:write` | Addressed by id |
 | `POST /delete/note/` | `DELETE real/notes/{not_id}/` | `real:delete` | 204 |
@@ -373,11 +376,11 @@ All v2 paths are relative to `https://www.nolio.io/api/v2/`. `{id}` stands for t
 | `POST /create/planned/training/` | `POST planned/trainings/` | `planned:write` | Audience in the body (`athletes` or `group`). `structured_workout` becomes `workout`. `hour_start` becomes `time` (`HH:MM`) or `moment`. New: `tags`, `recurrence`, `dry_run`. `plan_id` has no v2 equivalent: planned events no longer carry a plan link (to put a template on a calendar, use `POST library/plan_frames/{pfr_id}/apply/`; applied plans are listed with `GET planned/applied-plans/`) |
 | `POST /update/planned/training/` | `PATCH planned/trainings/{ptrn_id}/` | `planned:write` | `workout` is replaced as a whole. Optional concurrency check with `If-Match` (409 on conflict) |
 | `POST /delete/planned/training/` | `DELETE planned/trainings/{ptrn_id}/` | `planned:delete` | 204 |
-| `POST /create/planned/competition/` | `POST planned/competitions/` | `planned:write` | Same as planned trainings, plus `event`, `location`, `goal_type` |
+| `POST /create/planned/competition/` | `POST planned/competitions/` | `planned:write` | Same as planned trainings, plus `event`, `location`, `goal_type`. One athlete or one group per create |
 | `POST /update/planned/competition/` | `PATCH planned/competitions/{pcmp_id}/` | `planned:write` | Same as planned trainings |
 | `POST /delete/planned/competition/` | `DELETE planned/competitions/{pcmp_id}/` | `planned:delete` | 204 |
-| `GET /get/planned/note/` | `GET planned/notes/`, `GET planned/notes/{pnot_id}/` | `planned:read` | **Multi-day notes are now cycles**: `GET planned/cycles/` |
-| `POST /create/planned/note/` | `POST planned/notes/` (multi-day: `POST planned/cycles/`) | `planned:write` | Fields: `name`, `date_start`, `hour_start` (`HH:MM:SS`), `description`, `color`, `athletes`, `group`. `plan_id` has no equivalent. Cycles cannot overlap (409): overlapping v1 multi-day notes do not migrate as they are |
+| `GET /get/planned/note/` | `GET planned/notes/`, `GET planned/notes/{pnot_id}/` | `planned:read` | Same response changes as realized notes (`type` becomes `note_type`, type-specific fields are not returned). **Multi-day notes are now cycles**: `GET planned/cycles/` |
+| `POST /create/planned/note/` | `POST planned/notes/` (multi-day: `POST planned/cycles/`) | `planned:write` | Fields: `name`, `date_start`, `description`, `color`, `athletes` (one) or `group`. `hour_start` is read-only: no time can be set on create or update. `plan_id` has no equivalent. Cycles cannot overlap (409): overlapping v1 multi-day notes do not migrate as they are |
 | `POST /update/planned/note/` | `PATCH planned/notes/{pnot_id}/` | `planned:write` | Addressed by id |
 | `POST /delete/planned/note/` | `DELETE planned/notes/{pnot_id}/` | `planned:delete` | 204 |
 
@@ -385,7 +388,7 @@ All v2 paths are relative to `https://www.nolio.io/api/v2/`. `{id}` stands for t
 
 | v1 | v2 | Scope | What changes |
 |---|---|---|---|
-| `GET /get/metric/` | `GET metrics/values/{mtr_id}/` (list: `GET metrics/values/`) | `metrics:read` | `date` becomes `date_start`. `type` is gone: the metric type is `item` (`mti_...`), named in `GET metrics/items/`. New: `description` (free text of the value), `hour` (`HH:MM:SS`). `source` is a lowercase slug |
+| `GET /get/metric/` | `GET metrics/values/{mtr_id}/` (list: `GET metrics/values/`) | `metrics:read` | `date` becomes `date_start`. `type` is gone: the metric type is `item` (`mti_...`), named in `GET metrics/items/`. New: `description` (free text of the value). `hour` changes from `HH:MM` or `""` to `HH:MM:SS` or `null`. `source` is a lowercase slug |
 | `POST /update/metric/` | `POST metrics/values/` and `PATCH metrics/values/{mtr_id}/` | `metrics:write` | **No upsert**, see 7.1. `metric_id` becomes `item` (`mti_...`, from `GET metrics/items/`), `new_value` becomes `value`. Adds `hour`, `description`. Deleting is new: `DELETE metrics/values/{mtr_id}/` (`metrics:delete`) |
 | `GET /get/records/` | `GET metrics/records/` | `metrics:read` | Response `{data, has_more, windows}`. `sports` takes `spt_...` ids. `cat` and `record_type` are optional: without them you get only the `windows` catalog, `data` is empty. New `top` (1 to 10). `training_id` becomes `trn_`/`cmp_`. Paces are converted to the sport's unit |
 | `GET /get/hrv/rmssd/` | `GET metrics/hrv/rmssd/` | `metrics:read` | Same parameters. `source` is a case-insensitive slug. `id` is `mtr_...`. Still a bare array |
@@ -471,7 +474,7 @@ A step with neither `duration` nor `distance` is a note step, not sent to device
 | (not writable in v1) | `{"type": "zone", "zone": "Tempo", "stream": "watts"}` or `"zone": 4`: a zone of the athlete |
 | (not writable in v1) | `{"type": "rpe", "rpe": 7}`, `{"type": "rir", "rir": 2}` |
 
-Strength exercises, supersets and EMOM / For Time / AMRAP circuits could not be written in v1. In v2 they are `kind: "exercise"` (with an `exf_...` exercise id), `superset`, `emom`, `for_time`, `amrap`. See the OpenAPI schema.
+Strength exercises, supersets and EMOM / For Time / AMRAP circuits could not be written in v1, so a migration does not need them. In v2 they are `kind: "exercise"` (with an `exf_...` exercise id), `superset`, `emom`, `for_time`, `amrap`; the OpenAPI schema does not detail their fields.
 
 ### 8.4 Example
 
@@ -525,7 +528,7 @@ The sport must be one of the athlete's sports that supports structured workouts.
 | Retries | None (one attempt, 10 s timeout) | 5 attempts (after 30 s, 5 min, 30 min, 2 h), any 2xx is a success, 10 s timeout. Disabled automatically after 20 consecutive failed deliveries |
 | Test | `livemode: false`, `object_id: 0` | Event `ping` with an empty object. No `livemode` field |
 
-The list of event types, with which ones are on by default, is in `GET app/webhook/` (`available_events`). An event is only sent if your app holds the `<universe>:read` scope it belongs to. `team.*` events and `access.ended` carry a `data.context`; `team.member.*` events describe a member joining, leaving, being paused or resumed.
+The list of event types, with which ones are on by default, is in `GET app/webhook/` (`available_events`). An event is only sent if your app holds the `<universe>:read` scope it belongs to. `team.*` events carry a `data.context`. `access.ended` carries one (`data.context.team`) only when the access ended through a team: treat it as optional. `team.member.*` events describe a member joining, leaving, being paused or resumed.
 
 **`access.ended`** is delivered whatever your subscription, as long as your webhook is configured and enabled: one raised while it is paused or disabled is not replayed. It means your app no longer has access to that user's data: delete it on your side (API terms, article 7.2). Reconcile regularly with `GET app/users/` (API key of the app), which lists the users you still reach.
 
@@ -546,6 +549,7 @@ def verify(raw_body: bytes, header: str, secret: str, tolerance: int = 300) -> b
 ```
 
 What to change in your receiver:
+- Send `events` explicitly with `PUT app/webhook/`, listing every type your v1 receiver handled: the default subscription only covers `planned.training` and `real.training` created and updated, so deletions, competitions, notes and metric values are not delivered without it.
 - Verify the signature on the raw body, before parsing. Drop the `X-Nolio-Key` check.
 - Dispatch on `type`. Ignore unknown types (including `ping`): new ones will be added.
 - Deduplicate on `id`: a retry delivers the same `id` again.
@@ -575,7 +579,7 @@ v2 does not accept v1 integer ids, and no endpoint converts them. If your databa
    - **Teams and groups.** `GET team/teams/` and `GET me/groups/`.
    - **Events.** List each calendar on the date range you hold (`real/trainings/`, `real/competitions/`, `real/notes/`, `planned/trainings/`, `planned/competitions/`, `planned/notes/`, `planned/cycles/`), then match each stored event on **date + sport + name** (and `duration` for realized trainings). Store the v2 `id` next to your v1 id. Events your app created in v1 are only known to you by your `id_partner`: they go through the same matching.
    - **Unmatched events.** Recreate them in v2 and delete the v1 copy, or leave them.
-3. **Revoke the v1 access** of that user: `POST https://www.nolio.io/api/deauthorize/` with their v1 access token as `Authorization: Bearer`. It revokes every v1 token of that user and stops v1 webhooks for them. Until then, the user triggers both v1 and v2 webhooks: make sure you do not process the same change twice.
+3. **Revoke the v1 access** of that user: `POST https://www.nolio.io/api/deauthorize/` with a valid v1 access token of that user as `Authorization: Bearer`. Access tokens expire after 24 h: refresh it first with the v1 refresh token, otherwise the call returns 403 and revokes nothing. It revokes every v1 token of that user on your app and stops v1 webhooks for them. Until then, the user triggers both v1 and v2 webhooks: make sure you do not process the same change twice.
 
 Plan this step early: it is the longest part of most migrations.
 
