@@ -34,8 +34,8 @@ Rules that apply everywhere in v2:
 - Base URL https://www.nolio.io/api/v2/ and every path ends with "/" (no redirect: a
   missing slash is a 404).
 - Ids are opaque prefixed strings (usr_..., trn_..., ptrn_..., spt_...). Never parse
-  them, never compute them. v1 integer ids are rejected and cannot be converted:
-  rebuild the mapping as described in section 11 of the guide.
+  them, never compute them. v1 integer ids are rejected: convert the ones you
+  store with GET migration/ids/, as described in section 11 of the guide.
 - id_partner no longer exists. There is no duplicate check on creates.
 - Lists return {"data": [...], "has_more": bool}; paginate with limit (max 100) and
   starting_after=<id of the last row>. Exceptions: metrics/hrv/rmssd/ and
@@ -327,7 +327,7 @@ Quotas are counted per app, per hour and per day, with fixed windows. They are r
 | Response headers | None | `X-RateLimit-Limit-Hour`, `X-RateLimit-Remaining-Hour`, `X-RateLimit-Limit-Day`, `X-RateLimit-Remaining-Day`; `Retry-After` on 429 |
 | Read your quotas | | `GET /api/v2/app/` |
 
-`POST /api/v2/batch/` costs one unit per operation in addition to the call itself (section 10).
+`POST /api/v2/batch/` costs one unit per operation in addition to the call itself (section 10), and `GET /api/v2/migration/ids/` one unit per id (section 11).
 
 ---
 
@@ -570,16 +570,29 @@ What to change in your receiver:
 
 ## 11. Migrating the ids you already store
 
-v2 does not accept v1 integer ids, and no endpoint converts them. If your database stores v1 ids (`athlete_id`, `nolio_id`, `sport_id`, `metric_id`, or your `id_partner` keys), switch each user in this order:
+v2 does not accept v1 integer ids. `GET migration/ids/` converts the Nolio ids your database stores from v1 (`athlete_id`, `nolio_id`, `sport_id`, `metric_id`...) into v2 ids, until June 30, 2027 (then `410`). Switch each user in this order:
 
 1. **The user authorizes your v2 app** (partner app) or, for your own account, you create an API key (personal app).
-2. **Rebuild the mapping** for that user:
-   - **Athletes.** `GET me/athletes/`: match on name, or have each user reconnect through the v2 app, which gives you the `usr_...` directly.
-   - **Sports and metric types.** `GET sports/` and `GET metrics/items/`: match on name. Small, stable lists: map them once.
-   - **Teams and groups.** `GET team/teams/` and `GET me/groups/`.
-   - **Events.** List each calendar on the date range you hold (`real/trainings/`, `real/competitions/`, `real/notes/`, `planned/trainings/`, `planned/competitions/`, `planned/notes/`, `planned/cycles/`), then match each stored event on **date + sport + name** (and `duration` for realized trainings). Store the v2 `id` next to your v1 id. Events your app created in v1 are only known to you by your `id_partner`: they go through the same matching.
+2. **Convert the ids you store** for that user, with that user's token (or your API key for your own account):
+   - `GET migration/ids/?type=real.event&ids=101,102,103` takes 1 to 100 v1 ids and returns `{"data": [{"v1_id": 101, "id": "trn_..."}], "not_found": [103]}`.
+   - **Users first** (`type=user`): yourself and the athletes you coach. Then, as a coach, convert each athlete's events with `&athlete=usr_...`: one series of calls per athlete.
+   - An id lands in `not_found` when this token could not read it with the matching `GET`: deleted, not visible, missing scope or wrong `type`. Same rules and scopes as the `GET`.
+   - Each id costs one quota unit on top of the call (section 5.8): plan large histories over several hours.
+   - **Events your app created in v1** are known to you only by your `id_partner`, never by a Nolio id: list the calendar on the date range you hold, then match each one on **date + sport + name** (and `duration` for realized trainings). Store the v2 `id` next to your key.
+   - **Teams and groups** had no v1 id: `GET team/teams/` and `GET me/groups/`.
    - **Unmatched events.** Recreate them in v2 and delete the v1 copy, or leave them.
 3. **Revoke the v1 access** of that user: `POST https://www.nolio.io/api/deauthorize/` with a valid v1 access token of that user as `Authorization: Bearer`. Access tokens expire after 24 h: refresh it first with the v1 refresh token, otherwise the call returns 403 and revokes nothing. It revokes every v1 token of that user on your app and stops v1 webhooks for them. Until then, the user triggers both v1 and v2 webhooks: make sure you do not process the same change twice.
+
+| v1 id you store | `type` | v2 id |
+|---|---|---|
+| `athlete_id`, `user_id` | `user` | `usr_...` |
+| `sport_id` | `sport` | `spt_...` |
+| `metric_id` (metric type) | `metric_item` | `mti_...` |
+| Metric value | `metric_value` | `mtr_...` |
+| `nolio_id` of a realized training or competition | `real.event` | `trn_...` or `cmp_...` |
+| Realized note | `real.note` | `not_...` |
+| `nolio_id` of a planned training or competition | `planned.event` | `ptrn_...` or `pcmp_...` |
+| Planned note | `planned.note` | `pnot_...`, or `pcyc_...` for a multi-day note |
 
 Plan this step early: it is the longest part of most migrations.
 
