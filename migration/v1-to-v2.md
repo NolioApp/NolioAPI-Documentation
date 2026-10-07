@@ -570,7 +570,7 @@ What to change in your receiver:
 
 ## 11. Migrating the ids you already store
 
-v2 does not accept v1 integer ids. `GET migration/ids/` converts the Nolio ids your database stores from v1 (`athlete_id`, `nolio_id`, `sport_id`, `metric_id`...) into v2 ids, until June 30, 2027 (then `410`). Switch each user in this order:
+v2 does not accept v1 integer ids. `GET migration/ids/` converts the Nolio ids your database stores from v1 (`athlete_id`, `nolio_id`, `sport_id`, `metric_id`...) into v2 ids, until June 30, 2027 (then `410`). For each user:
 
 1. **The user authorizes your v2 app** (partner app) or, for your own account, you create an API key (personal app).
 2. **Convert the ids you store** for that user, with that user's token (or your API key for your own account):
@@ -580,8 +580,6 @@ v2 does not accept v1 integer ids. `GET migration/ids/` converts the Nolio ids y
    - Each id costs one quota unit on top of the call (section 5.8): plan large histories over several hours.
    - **Events your app created in v1** are known to you only by your `id_partner`, never by a Nolio id: list the calendar on the date range you hold, then match each one on **date + sport + name** (and `duration` for realized trainings). Store the v2 `id` next to your key.
    - **Teams and groups** had no v1 id: `GET team/teams/` and `GET me/groups/`.
-   - **Unmatched events.** Recreate them in v2 and delete the v1 copy, or leave them.
-3. **Revoke the v1 access** of that user: `POST https://www.nolio.io/api/deauthorize/` with a valid v1 access token of that user as `Authorization: Bearer`. Access tokens expire after 24 h: refresh it first with the v1 refresh token, otherwise the call returns 403 and revokes nothing. It revokes every v1 token of that user on your app and stops v1 webhooks for them. Until then, the user triggers both v1 and v2 webhooks: make sure you do not process the same change twice.
 
 | v1 id you store | `type` | v2 id |
 |---|---|---|
@@ -593,8 +591,6 @@ v2 does not accept v1 integer ids. `GET migration/ids/` converts the Nolio ids y
 | Realized note | `real.note` | `not_...` |
 | `nolio_id` of a planned training or competition | `planned.event` | `ptrn_...` or `pcmp_...` |
 | Planned note | `planned.note` | `pnot_...`, or `pcyc_...` for a multi-day note |
-
-Plan this step early: it is the longest part of most migrations.
 
 ---
 
