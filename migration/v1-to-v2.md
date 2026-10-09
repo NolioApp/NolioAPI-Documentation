@@ -70,7 +70,7 @@ Work plan:
 3. **The v2 partner app starts blocked**, even if your v1 app was activated. Request activation again from the portal (section 3).
 4. **Resource paths and HTTP verbs.** `POST /api/create/training/` becomes `POST /api/v2/real/trainings/`, `POST /api/update/...` becomes `PATCH .../{id}/`, `POST /api/delete/...` becomes `DELETE .../{id}/` (section 6).
 5. **Trailing slash is mandatory.** `/api/v2/me` returns a JSON 404, not a redirect.
-6. **New opaque ids.** `usr_...`, `trn_...`, `ptrn_...`, `spt_...`. Integer ids are rejected, and there is no conversion endpoint (section 11).
+6. **New opaque ids.** `usr_...`, `trn_...`, `ptrn_...`, `spt_...`. Integer ids are rejected: convert the ids you store with `GET migration/ids/` (section 11).
 7. **No `id_partner`.** You can no longer address an event by your own id, and Nolio no longer deduplicates creates or file uploads (section 5.3).
 8. **Competitions are their own resources**, on the realized calendar (`/real/competitions/`) and on the planned one (`/planned/competitions/`). Reading `/real/trainings/` alone misses every race.
 9. **Granular scopes.** Request `real:read planned:write ...` explicitly. A new app starts with read scopes only (section 4).
