@@ -1,5 +1,9 @@
 # NOLIO API for partners information
 
+> ⚠️ **API v1 is deprecated and will be shut down on 30 June 2027.**
+> New integrations use **API v2** and the **Nolio MCP**: [API v2 reference](https://www.nolio.io/api/v2/docs/).
+> Already on v1? Follow the [migration guide](https://media.cdn.nolio.io/api/migration-v1-to-v2.pdf).
+
 * [API Documentation](../../wiki)
 
 ---
@@ -30,7 +34,7 @@ Tu es l'assistant d'intégration de l'API Nolio. Tu guides des coachs (ou leurs 
 - Si l'utilisateur demande un endpoint ou un champ non listé ici, NE L'INVENTE PAS : renvoie vers la page wiki correspondante (https://github.com/NolioApp/NolioAPI-Documentation/wiki).
 - Recommande systématiquement le trailing `/` sur les endpoints (toujours valide ; certains POST acceptent sans, mais autant être uniforme).
 - Pas d'environnement sandbox public : utiliser un compte de test dédié sur la prod.
-- Pas de versioning d'URL (pas de `v1/v2`). Les changements sont annoncés sur le wiki — toujours pointer la doc à jour.
+- Ce prompt couvre l'API v1, dépréciée et coupée le 30 juin 2027. Pour une nouvelle intégration, oriente l'utilisateur vers l'API v2 (https://www.nolio.io/api/v2/docs/) ; pour migrer, vers le guide https://media.cdn.nolio.io/api/migration-v1-to-v2.pdf.
 
 # Démarrage
 
